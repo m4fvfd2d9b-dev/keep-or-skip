@@ -11,7 +11,7 @@
 :root{
   --hue:265; --bg:#120e1c; --fg:#fbf7f2; --muted:#d3cbd9;
   --glass:rgba(255,255,255,.09); --glass-2:rgba(255,255,255,.14); --edge:rgba(255,255,255,.22);
-  --yes:#ffb36b; --yes-ink:#2e1804;
+  --yes:hsl(var(--hue) 42% 84%); --yes-ink:hsl(var(--hue) 40% 14%);
   --display:"Bricolage Grotesque","Trebuchet MS",sans-serif; --body:"Figtree","Segoe UI",system-ui,sans-serif;
   color-scheme:dark;
 }
@@ -48,6 +48,7 @@ h1 em{font-style:normal;color:var(--yes)}
 button,.btn{font:600 .95rem var(--body);border-radius:12px;border:1px solid var(--edge);background:var(--glass);color:var(--fg);padding:10px 14px;cursor:pointer;text-decoration:none;display:inline-block;
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 button:hover,.btn:hover{background:var(--glass-2)}
+.primary:hover{background:var(--yes);filter:brightness(1.07)}
 :focus-visible{outline:2px solid var(--yes);outline-offset:2px}
 .verdict{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .verdict button{padding:18px 10px;font:800 1.25rem var(--display);border-radius:16px}
@@ -158,7 +159,7 @@ button:hover,.btn:hover{background:var(--glass-2)}
       <section class="panel">
         <h3>Your playlist</h3>
         <p class="small" id="syncStatus">Your keeps are saved to a private Spotify playlist called Keep or Skip.</p>
-        <div class="jump"><button id="sync" class="primary">Save now</button><a class="btn" id="openPlaylist" target="_blank" rel="noopener" hidden>Open playlist</a><button id="copy">Copy links</button><button id="logout">Disconnect</button></div>
+        <div class="jump"><button id="sync" class="primary">Save now</button><a class="btn" id="openPlaylist" target="_blank" rel="noopener" hidden>Open playlist</a><button id="copy">Copy links</button><button id="logout" hidden>Disconnect</button></div>
         <textarea id="fallback" hidden readonly aria-label="Spotify links to copy"></textarea>
       </section>
     </aside>
@@ -445,6 +446,7 @@ T('2zzLRQ78kKfPTx8FJQCdC2','When The Sun Goes Down','Arctic Monkeys','Whatever P
 const CLIENT_ID='5797e2c9f8194e42a56f4bd98977b2aa', REDIRECT='https://m4fvfd2d9b-dev.github.io/keep-or-skip/';
 const SCOPES='user-top-read user-library-read user-read-private playlist-modify-private playlist-modify-public';
 const ARTISTS=[['Kevin',['0IxgA9wO4Op3CSnPlhfwV1','5YXTGHsdyl2UsBPfjx1dE9']],['Dave',['6Ip8FS7vWT1uKkJSweANQK']],['SL'],['Kendrick Lamar',['2YZyLoL8N0Wb9xBt1NhZWg']],['Drake',['3TVXtAsR1Inumwj472S9r4']],['J. Cole',['6l3HvQ5sa6mXTsMTB19rO5']],['Kanye West',['5K4W6rqBFWDnAN6FQUkS6x','3NlsBPwqJuDgtXZ2rv5Dmq']],['JAY-Z',['3nFkdlSjzX9mRTtwJOzDYB']],['Cigarettes After Sex',['1QAJqy2dA3ihHBFIHRphZj']],['Billy Idol'],['Metro Boomin',['0iEtIxbK0KxaSlF7G42ZOp']]];
+const SIMILAR=['Frenna','Josylvio','Sevn Alias','Jonna Fraser','Boef','Ronnie Flex','Lil Kleine','Hef','Lijpe','Dopebwoy','Chivv','Kempi','Mula B','Bizzey','Nekfeu','Damso','SCH','Laylow','Hamza','Ninho','Tiakola','Zola','Tyler, The Creator','A$AP Rocky','Isaiah Rashad','Smino','JID','Joey Bada$$','Childish Gambino','Earl Sweatshirt','Anderson .Paak','ScHoolboy Q','Vince Staples','SZA','Brent Faiyaz','Daniel Caesar','Jorja Smith','Giveon','Kali Uchis','H.E.R.','Summer Walker','Bryson Tiller','PARTYNEXTDOOR','6LACK','Ari Lennox','Snoh Aalegra','Cleo Sol','SAULT','Solange',"D'Angelo",'Erykah Badu','Burna Boy','Rema','Ayra Starr','Omah Lay','Wizkid','TV Girl','Beach House','Mazzy Star','Mac DeMarco','Men I Trust','Clairo','Djo','The Marías','Tame Impala','Lana Del Rey','Joji','Rex Orange County','Still Woozy','Dominic Fike','Billie Eilish','Dire Straits','The Police','Hall & Oates','Tears for Fears'];
 const $=id=>document.getElementById(id);
 const KEY='keep-or-skip-v1',AUTH='keep-or-skip-auth';
 const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))||f}catch(e){return f}};
@@ -487,7 +489,7 @@ async function api(path,opt={},tries=3){
 }
 const norm=(t,src)=>t&&t.id&&!t.is_local?{id:t.id,title:t.name,artist:t.artists.map(a=>a.name).join(', '),album:t.album?.name||'',src}:null;
 async function buildStack(){
-  const say=m=>{$('loadStatus').textContent=m;$('syncStatus').dataset.x=m},own=[],artists=[],decided=new Set(st.picks.map(p=>p.id)),base=st.refills*30;let topA=[];
+  const say=m=>{$('loadStatus').textContent=m;$('syncStatus').dataset.x=m},own=[],artists=[],fresh=[],decided=new Set(st.picks.map(p=>p.id)),base=st.refills*30;let topA=[];
   const safe=async f=>{try{return await f()}catch(e){if(e.status===401||e.status===403)say('Spotify refused one request ('+e.status+'). Continuing with the rest.');return null}};
   say('Reading your top tracks…');
   for(const r of ['short_term','medium_term','long_term']){const j=await safe(()=>api(`/me/top/tracks?limit=50&time_range=${r}`));(j?.items||[]).forEach(t=>own.push(norm(t,'top')))}
@@ -499,12 +501,17 @@ async function buildStack(){
     for(const o of [0,10,20]){const j=await safe(()=>api(`/search?type=track&limit=10&offset=${base+o}&market=from_token&q=${encodeURIComponent('artist:"'+name+'"')}`));
       (j?.tracks?.items||[]).forEach(t=>{if(t&&t.artists.some(a=>ids?ids.includes(a.id):a.name.toLowerCase()===name.toLowerCase()))artists.push(norm(t,'artist'))});if(!j?.tracks?.next)break}}
   const eyes=await safe(()=>api('/search?type=track&limit=10&market=from_token&q='+encodeURIComponent('track:"Eyes Without A Face" artist:"Billy Idol"')));(eyes?.tracks?.items||[]).forEach(t=>artists.push(norm(t,'artist')));
+  const picks=shuffle(SIMILAR).slice(0,45);n=0;
+  for(const name of picks){say(`Finding new music: ${name}… (${++n} of ${picks.length})`);
+    const o=Math.floor(Math.random()*4)*10;
+    const j=await safe(()=>api(`/search?type=track&limit=10&offset=${o}&market=from_token&q=${encodeURIComponent('artist:"'+name+'"')}`));
+    (j?.tracks?.items||[]).forEach(t=>{if(t&&t.artists.some(a=>a.name.toLowerCase()===name.toLowerCase()))fresh.push(norm(t,'new'))})}
   const seen=new Set(decided),uniq=l=>shuffle(l.filter(Boolean)).filter(t=>!seen.has(t.id)&&seen.add(t.id));
-  const a=uniq(own),b=uniq(artists),c=st.refills?[]:uniq(ALL),mix=[];
-  while(a.length||b.length||c.length){for(let i=0;i<2;i++){if(a.length)mix.push(a.pop());if(b.length)mix.push(b.pop())}if(c.length)mix.push(c.pop())}
+  const a=uniq(own),d=uniq(fresh),b=uniq(artists),c=st.refills?[]:uniq(ALL),mix=[];
+  while(a.length||b.length||c.length||d.length){for(let i=0;i<4;i++)if(d.length)mix.push(d.pop());if(c.length)mix.push(c.pop());if(b.length)mix.push(b.pop());if(c.length)mix.push(c.pop());if(a.length)mix.push(a.pop())}
   const deck=[];while(mix.length){const r=deck.slice(-8).map(leadArtist);let k=mix.findIndex(t=>!r.includes(leadArtist(t)));if(k<0)k=0;deck.push(mix.splice(k,1)[0])}
   st.deck=st.deck.slice(0,st.i).concat(deck);save();
-  const live=deck.filter(t=>t.src).length;say(`${deck.length} tracks ready, ${live} of them straight from your Spotify.`);
+  const nw=deck.filter(t=>t.src==='new').length;st.v=2;save();say(`${deck.length} tracks ready, including ${nw} new discoveries.`);
 }
 let controller=null,apiFailed=false,started=false,position=0;
 window.onSpotifyIframeApiReady=api_=>{const el=$('player');
@@ -579,7 +586,7 @@ addEventListener('keydown',e=>{if($('deck').hidden)return;if(e.key==='ArrowRight
   try{await callback()}catch(e){$('loadStatus').textContent=e.message;return}
   if(!auth)return;
   $('login').hidden=true;$('logout').hidden=false;$('startText').textContent='Your stack is being built from your Spotify.';
-  if(st.deck.length<=st.i)await buildStack();
+  if(st.deck.length<=st.i||st.v!==2)await buildStack();
   $('startText').textContent=st.picks.length?'Welcome back. Your stack is ready.':'Your stack is ready. Listen, then keep it or skip it.';
   $('go').textContent=st.picks.length?'Pick up where you left off':'Start listening';$('go').hidden=false;
 })();
