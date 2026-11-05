@@ -4,96 +4,78 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Keep or Skip</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;500;600&display=swap">
 <style>
-/* Layout: one frosted pane floating on a slow colour field that shifts with each artist */
-:root{
-  --hue:265; --bg:#120e1c; --fg:#fbf7f2; --muted:#d3cbd9;
-  --glass:rgba(255,255,255,.09); --glass-2:rgba(255,255,255,.14); --edge:rgba(255,255,255,.22);
-  --yes:hsl(var(--hue) 42% 84%); --yes-ink:hsl(var(--hue) 40% 14%);
-  --display:"Bricolage Grotesque","Trebuchet MS",sans-serif; --body:"Figtree","Segoe UI",system-ui,sans-serif;
-  color-scheme:dark;
-}
+/* Layout: one calm glass player beside one glass side panel, on a near-black field */
+:root{--hue:230;--bg:#0b0b0e;--fg:#f4f4f6;--muted:#9a9aa3;--line:rgba(255,255,255,.1);--glass:rgba(255,255,255,.055);--hover:rgba(255,255,255,.1);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{min-height:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px}
-body::before{content:"";position:fixed;inset:0;z-index:-1;transition:background .6s ease;background:
-  radial-gradient(45vmax 45vmax at 12% 10%,hsl(var(--hue) 75% 42%/.75),transparent 70%),
-  radial-gradient(40vmax 40vmax at 90% 25%,hsl(calc(var(--hue) + 70) 80% 48%/.6),transparent 70%),
-  radial-gradient(50vmax 50vmax at 60% 100%,hsl(calc(var(--hue) - 60) 70% 38%/.7),transparent 70%)}
-main{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
-h1{font:800 clamp(1.7rem,6vw,2.3rem)/1 var(--display);margin:0;letter-spacing:-.02em}
-h1 em{font-style:normal;color:var(--yes)}
-.count{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.95rem}
-.count b{color:var(--fg);font-weight:600}
-.bar{height:5px;background:var(--glass);border-radius:3px;overflow:hidden}
-.bar i{display:block;height:100%;width:0;background:var(--yes);transition:width .2s}
-.card,.results{background:var(--glass);border:1px solid var(--edge);border-radius:22px;padding:20px;
-  -webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);
-  box-shadow:0 18px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25)}
-.card{display:flex;flex-direction:column;gap:14px;touch-action:pan-y;transition:transform .16s ease,opacity .16s ease}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font);-webkit-font-smoothing:antialiased;
+  padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-block:24px 40px}
+body::before{content:"";position:fixed;inset:0;z-index:-1;transition:background .8s ease;
+  background:radial-gradient(60vmax 45vmax at 30% 0%,hsl(var(--hue) 28% 24%/.55),transparent 70%),radial-gradient(50vmax 40vmax at 85% 100%,hsl(calc(var(--hue) + 40) 24% 20%/.4),transparent 70%)}
+main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+h1{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0}
+h1 em{font-style:normal;color:var(--muted);font-weight:400}
+.count{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.bar{height:2px;background:var(--line);border-radius:1px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--fg);transition:width .25s}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.card,.panel,.side{background:var(--glass);border:1px solid var(--line);border-radius:20px;
+  -webkit-backdrop-filter:blur(30px) saturate(130%);backdrop-filter:blur(30px) saturate(130%)}
+.card{padding:22px;display:flex;flex-direction:column;gap:16px;touch-action:pan-y;transition:transform .16s ease,opacity .16s ease}
+.panel{padding:22px;display:flex;flex-direction:column;gap:12px}
+.panel h3{display:none}
 .drag{cursor:grab;user-select:none}
-.drag h2{font:800 clamp(1.5rem,5vw,2rem)/1.1 var(--display);margin:0;text-wrap:balance;overflow-wrap:anywhere}
-.artist{margin:6px 0 0;color:var(--muted)}
-.player{min-height:152px}
-.player iframe{display:block;width:100%;height:152px;border:0;border-radius:14px}
-.outside{min-height:152px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:10px;background:var(--glass);border-radius:14px;padding:16px}
-.outside p{margin:0;color:var(--muted);font-size:.95rem}
-.jump{display:flex;gap:8px;flex-wrap:wrap}
-.status{min-height:1.4em;margin:0;color:var(--muted);font-size:.9rem}
-button,.btn{font:600 .95rem var(--body);border-radius:12px;border:1px solid var(--edge);background:var(--glass);color:var(--fg);padding:10px 14px;cursor:pointer;text-decoration:none;display:inline-block;
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-button:hover,.btn:hover{background:var(--glass-2)}
-.primary:hover{background:var(--yes);filter:brightness(1.07)}
-:focus-visible{outline:2px solid var(--yes);outline-offset:2px}
-.verdict{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.verdict button{padding:18px 10px;font:800 1.25rem var(--display);border-radius:16px}
-#yes{background:var(--yes);color:var(--yes-ink);border-color:transparent}
-#yes:hover{filter:brightness(1.07)}
-.tools{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.tools button{font-size:.9rem;padding:7px 11px}
-.hint{margin:0;color:var(--muted);font-size:.85rem}
-.results{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
-.results h2{font:800 1.6rem/1.15 var(--display);margin:0;text-wrap:balance}
-.results h3{font:800 1.1rem var(--display);margin:8px 0 0}
-.results p{margin:0;color:var(--muted)}
-.results ol{margin:0;padding-left:1.5em;display:flex;flex-direction:column;gap:4px}
-.results a{color:var(--yes)}
-#fallback{width:100%;height:110px;background:var(--glass);color:var(--fg);border:1px solid var(--edge);border-radius:12px;padding:8px}
-@media (prefers-reduced-motion:reduce){.card,.bar i,body::before{transition:none}}
-.layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
-.col{display:flex;flex-direction:column;gap:14px;min-width:0}
-.panel{background:var(--glass);border:1px solid var(--edge);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0;
-  -webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);box-shadow:0 18px 50px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.2)}
-.panel h3{margin:0;font:500 .78rem var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.tile{background:var(--glass);border-radius:14px;padding:12px}
-.tile b{display:block;font:800 1.7rem/1.1 var(--display);font-variant-numeric:tabular-nums}
-.tile span{font-size:.8rem;color:var(--muted)}
-.rows{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
-.row{display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:10px;align-items:center;font-size:.92rem}
+.drag h2{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin:0;text-wrap:balance;overflow-wrap:anywhere}
+.artist{margin:4px 0 0;color:var(--muted)}
+.player{min-height:352px}
+.player iframe{display:block;width:100%;height:352px;border:0;border-radius:14px}
+.jump{display:flex;gap:6px 16px;flex-wrap:wrap;align-items:center}
+.status{min-height:1.4em;margin:0;color:var(--muted);font-size:13px}
+button,.btn{font:500 14px var(--font);border:0;background:none;color:var(--muted);padding:0;cursor:pointer;text-decoration:none}
+button:hover,.btn:hover{color:var(--fg)}
+:focus-visible{outline:2px solid var(--fg);outline-offset:3px;border-radius:6px}
+.primary{background:var(--fg);color:#0b0b0e;padding:9px 18px;border-radius:999px}
+.primary:hover{background:#fff;color:#0b0b0e}
+.verdict{display:flex;justify-content:center;gap:28px}
+.verdict button{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0;
+  background:var(--glass);border:1px solid var(--line);color:var(--fg);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);transition:transform .12s ease,background .12s ease}
+.verdict button:hover{background:var(--hover);transform:scale(1.05)}
+#yes{background:var(--fg);color:#0b0b0e;border-color:transparent}
+#yes:hover{background:#fff}
+.verdict svg{width:24px;height:24px}
+.tools{display:flex;justify-content:center}
+.tools button,.hint{font-size:13px}
+.hint{margin:0;color:var(--muted);text-align:center}
+.side{padding:6px 20px}
+.side section{padding:16px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px;min-width:0}
+.side section:last-child{border-bottom:0}
+.side h3{margin:0;font-size:13px;font-weight:500;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tile b{display:block;font-size:20px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted)}
+.rows{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 .row .name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .track{grid-column:1/-1;height:5px;border-radius:3px;background:var(--glass)}
-.row .track i{display:block;height:100%;border-radius:3px;background:var(--yes)}
-.row .n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
-.recent a{color:var(--fg);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92rem}
-.recent a:hover{color:var(--yes)}
-.empty{margin:0;color:var(--muted);font-size:.92rem}
-.small{margin:0;color:var(--muted);font-size:.85rem}
-.primary{background:var(--yes);color:var(--yes-ink);border-color:transparent}
-@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:460px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.row .track{display:none}
+.row .n{color:var(--muted);font-variant-numeric:tabular-nums}
+.recent a{color:var(--fg);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.recent a:hover{color:var(--muted)}
+.empty,.small{margin:0;color:var(--muted);font-size:13px}
+#fallback{width:100%;height:90px;background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){.card,.bar i,body::before,.verdict button{transition:none}}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Keep <em>or</em> skip</h1>
-    <span class="count"><span id="left">0</span> tracks left in the stack</span>
+    <h1>Keep or Skip</h1>
+    <span class="count"><span id="left">0</span> left</span>
   </header>
   <div class="bar" aria-hidden="true"><i id="fill"></i></div>
   <div class="layout">
@@ -122,13 +104,13 @@ button:hover,.btn:hover{background:var(--glass-2)}
           <p class="status" id="status"></p>
         </article>
         <div class="verdict">
-          <button id="no">Skip</button>
-          <button id="yes">Keep</button>
+          <button id="no" aria-label="Skip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          <button id="yes" aria-label="Keep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
         </div>
         <div class="tools">
-          <button id="undo">Undo last choice</button>
+          <button id="undo">Undo</button>
         </div>
-        <p class="hint">Right arrow keeps, left arrow skips, Backspace undoes. On a touchscreen, swipe the title.</p>
+        
       </section>
       <section id="end" class="panel" hidden>
         <h3>All done</h3>
@@ -136,27 +118,27 @@ button:hover,.btn:hover{background:var(--glass-2)}
         <div class="jump"><button id="more" class="primary">Find more tracks</button><button id="undo2">Undo last choice</button></div>
       </section>
     </div>
-    <aside class="col">
-      <section class="panel">
-        <h3>Session</h3>
-        <div class="tiles">
+    <aside class="side">
+      <section>
+                <div class="tiles">
           <div class="tile"><b id="kept">0</b><span>Kept</span></div>
           <div class="tile"><b id="skipped">0</b><span>Skipped</span></div>
           <div class="tile"><b id="rate">0%</b><span>Keep rate</span></div>
           <div class="tile"><b id="artists">0</b><span>Artists</span></div>
         </div>
+        <p class="small" id="taste"></p>
       </section>
-      <section class="panel">
-        <h3>Top artists in your playlist</h3>
+      <section>
+        <h3>Top artists</h3>
         <ul class="rows" id="topArtists"></ul>
         <p class="empty" id="topEmpty">Keep a few tracks to see your mix here.</p>
       </section>
-      <section class="panel">
-        <h3>Latest keeps</h3>
+      <section>
+        <h3>Recently kept</h3>
         <ul class="rows recent" id="recent"></ul>
         <p class="empty" id="recentEmpty">Nothing kept yet.</p>
       </section>
-      <section class="panel">
+      <section>
         <h3>Your playlist</h3>
         <p class="small" id="syncStatus">Your keeps are saved to a private Spotify playlist called Keep or Skip.</p>
         <div class="jump"><button id="sync" class="primary">Save now</button><a class="btn" id="openPlaylist" target="_blank" rel="noopener" hidden>Open playlist</a><button id="copy">Copy links</button><button id="logout" hidden>Disconnect</button></div>
@@ -455,7 +437,38 @@ let st=load(KEY,{deck:[],i:0,picks:[],synced:[],playlistId:null,playlistUrl:null
 let auth=load(AUTH,null);
 const save=()=>store(KEY,st);
 const kept=()=>st.picks.filter(p=>p.yes);
-const leadArtist=t=>t.artist.split(/,| & /)[0];
+const GROUPS={'Dutch rap':['Kevin','Jack','Ares','Johnny Sellah','Frenna','Josylvio','Sevn Alias','Jonna Fraser','Boef','Ronnie Flex','Lil Kleine','Hef','Lijpe','Dopebwoy','Chivv','Kempi','Mula B','Bizzey','Ismo'],
+'French rap':['PNL','Nekfeu','Damso','SCH','Laylow','Hamza','Ninho','Tiakola','Zola','Jazzy Bazz'],
+'US rap':['Kendrick Lamar','Drake','J. Cole','Kanye West','JAY-Z','Mac Miller','Travis Scott','Metro Boomin','Future','21 Savage','Baby Keem','Tyler, The Creator','A$AP Rocky','Isaiah Rashad','Smino','JID','Joey Bada$$','Childish Gambino','Earl Sweatshirt','Anderson .Paak','ScHoolboy Q','Vince Staples','The Notorious B.I.G.'],
+'UK rap':['Dave','SL'],
+'Mellow R&B':['Frank Ocean','Sade','Tems','SZA','Brent Faiyaz','Daniel Caesar','Jorja Smith','Giveon','Kali Uchis','H.E.R.','Summer Walker','Bryson Tiller','PARTYNEXTDOOR','6LACK','Ari Lennox','Snoh Aalegra','Cleo Sol','SAULT','Solange',"D'Angelo",'Erykah Badu','Steve Lacy'],
+'Afrobeats':['Burna Boy','Rema','Ayra Starr','Omah Lay','Wizkid'],
+'Dreamy indie':['Cigarettes After Sex','TV Girl','Beach House','Mazzy Star','Mac DeMarco','Men I Trust','Clairo','Djo','The Marías','Tame Impala','Lana Del Rey','Joji','Rex Orange County','Still Woozy','Dominic Fike','Billie Eilish','The Neighbourhood','Arctic Monkeys'],
+'Classics':['Dire Straits','Fleetwood Mac','Sting','The Police','Hall & Oates','Tears for Fears','Billy Idol','The War On Drugs','Adele','Coldplay']};
+const leadArtist=t=>t.artist.startsWith('Tyler, The Creator')?'Tyler, The Creator':t.artist.startsWith('Hall & Oates')?'Hall & Oates':t.artist.split(/,| & /)[0];
+const groupOf=t=>Object.keys(GROUPS).find(g=>GROUPS[g].includes(leadArtist(t)))||Object.keys(GROUPS).find(g=>GROUPS[g].some(n=>t.artist.includes(n)))||null;
+const brain=()=>st.brain||(st.brain={a:{},g:{},fetched:{},tried:[]});
+const inStack=()=>new Set([...st.deck.map(t=>t.id),...st.picks.map(p=>p.id)]);
+function insertSoon(list){const have=inStack();list.filter(t=>t&&!have.has(t.id)).slice(0,2).forEach(t=>{const pos=Math.min(st.i+5+Math.floor(Math.random()*11),st.deck.length);st.deck.splice(pos,0,t)});save();stats()}
+async function fetchArtist(name,offset,src){const j=await api(`/search?type=track&limit=10&offset=${offset}&market=from_token&q=${encodeURIComponent('artist:"'+name+'"')}`);
+  return shuffle((j?.tracks?.items||[]).filter(t=>t&&t.artists.some(a=>a.name.toLowerCase()===name.toLowerCase())).map(t=>norm(t,src)))}
+async function grow(t){if(!auth)return;const b=brain(),a=leadArtist(t),g=groupOf(t);
+  try{if(t.albumId&&!(b.albums||(b.albums=[])).includes(t.albumId)){b.albums.push(t.albumId);
+      const j=await api(`/albums/${t.albumId}/tracks?limit=20`);
+      insertSoon(shuffle((j?.items||[]).filter(x=>x&&x.id).map(x=>({id:x.id,title:x.name,artist:x.artists.map(y=>y.name).join(', '),album:t.album,albumId:t.albumId,src:'more'}))))}
+  }catch(e){}
+  try{b.fetched[a]=(b.fetched[a]||0)+1;if(b.fetched[a]<=3)insertSoon(await fetchArtist(a,b.fetched[a]*10-10,'more'));
+    if(g&&(b.g[g]||0)>=3){const o=GROUPS[g].filter(n=>!b.tried.includes(n)&&!b.a[n]);if(o.length){const n=o[Math.floor(Math.random()*o.length)];b.tried.push(n);insertSoon(await fetchArtist(n,0,'new'))}}
+  }catch(e){}}
+function reorder(){const b=brain(),rest=st.deck.slice(st.i);
+  const w=t=>(b.a[leadArtist(t)]||0)*2+(b.g[groupOf(t)]||0)+Math.random()*3;
+  const sorted=rest.map(t=>[w(t),t]).sort((x,y)=>y[0]-x[0]).map(x=>x[1]),out=[];
+  for(let i=0;sorted.length;i++)out.push(i%4===3?sorted.splice(Math.floor(Math.random()*sorted.length),1)[0]:sorted.shift());
+  st.deck=st.deck.slice(0,st.i).concat(out)}
+function learn(t,yes,sign=1){const b=brain(),a=leadArtist(t),g=groupOf(t);b.a[a]=(b.a[a]||0)+sign*(yes?2:-1);if(g)b.g[g]=(b.g[g]||0)+sign*(yes?1:-.5);
+  if(sign<0)return;
+  if(yes)grow(t);else if(b.a[a]<=-2){const rest=st.deck.slice(st.i);st.deck=st.deck.slice(0,st.i).concat(rest.filter(x=>leadArtist(x)!==a),rest.filter(x=>leadArtist(x)===a))}
+  if(st.picks.length>=8&&st.picks.length%8===0)reorder()}
 const trackUrl=t=>'https://open.spotify.com/track/'+t.id;
 const shuffle=l=>{const a=l.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -487,7 +500,7 @@ async function api(path,opt={},tries=3){
   if(!r.ok){const e=new Error('Spotify error '+r.status);e.status=r.status;throw e}
   return r.status===204?null:r.json();
 }
-const norm=(t,src)=>t&&t.id&&!t.is_local?{id:t.id,title:t.name,artist:t.artists.map(a=>a.name).join(', '),album:t.album?.name||'',src}:null;
+const norm=(t,src)=>t&&t.id&&!t.is_local?{id:t.id,title:t.name,artist:t.artists.map(a=>a.name).join(', '),album:t.album?.name||'',albumId:t.album?.id||null,src}:null;
 async function buildStack(){
   const say=m=>{$('loadStatus').textContent=m;$('syncStatus').dataset.x=m},own=[],artists=[],fresh=[],decided=new Set(st.picks.map(p=>p.id)),base=st.refills*30;let topA=[];
   const safe=async f=>{try{return await f()}catch(e){if(e.status===401||e.status===403)say('Spotify refused one request ('+e.status+'). Continuing with the rest.');return null}};
@@ -515,7 +528,7 @@ async function buildStack(){
 }
 let controller=null,apiFailed=false,started=false,position=0;
 window.onSpotifyIframeApiReady=api_=>{const el=$('player');
-  api_.createController(el,{uri:'spotify:track:7eqoqGkKwgOaWNNHx90uEZ',width:'100%',height:152},c=>{controller=c;
+  api_.createController(el,{uri:'spotify:track:7eqoqGkKwgOaWNNHx90uEZ',width:'100%',height:352,theme:'dark'},c=>{controller=c;
     c.addListener('playback_update',e=>{position=e.data.position;const full=e.data.duration>35000;$('jumpRow').hidden=!full;
       if(e.data.duration)$('status').textContent=full?'Full track. Jump ahead to find the chorus.':'30-second preview chosen by Spotify.'});
     if(started)render()})};
@@ -531,6 +544,8 @@ function stats(){
     const nm=document.createElement('span');nm.className='name';nm.textContent=a;const ct=document.createElement('span');ct.className='n';ct.textContent=v;
     const tr=document.createElement('span');tr.className='track';const f=document.createElement('i');f.style.width=(v/top[0][1]*100)+'%';tr.append(f);li.append(nm,ct,tr);return li}));
   $('recent').replaceChildren(...k.slice(-6).reverse().map(t=>{const li=document.createElement('li'),a=document.createElement('a');a.href=trackUrl(t);a.target='_blank';a.rel='noopener';a.textContent=t.title+' · '+t.artist;li.append(a);return li}));
+  const g=Object.entries(brain().g).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).slice(0,3).map(x=>x[0]);
+  $('taste').textContent=st.picks.length<5?'Your stack adapts as you choose.':g.length?'Leaning towards: '+g.join(', ')+'.':'Still learning your taste.';
   if(st.playlistUrl){$('openPlaylist').href=st.playlistUrl;$('openPlaylist').hidden=false}
 }
 function render(){
@@ -541,7 +556,7 @@ function render(){
   $('lyrics').href='https://genius.com/search?q='+encodeURIComponent(t.title+' '+t.artist);$('openTrack').href=trackUrl(t);
   $('title').textContent=t.title;$('artist').textContent=t.artist+(t.album?' · '+t.album:'');$('status').textContent='';$('jumpRow').hidden=true;
   if(controller){controller.loadUri('spotify:track:'+t.id);setTimeout(()=>controller.play(),500)}
-  else if(apiFailed){$('player').innerHTML='';const f=document.createElement('iframe');f.src='https://open.spotify.com/embed/track/'+t.id;f.allow='autoplay; encrypted-media';f.title='Spotify player: '+t.title;$('player').append(f);$('status').textContent='Press play in the player.'}
+  else if(apiFailed){$('player').innerHTML='';const f=document.createElement('iframe');f.src='https://open.spotify.com/embed/track/'+t.id+'?theme=0';f.allow='autoplay; encrypted-media';f.title='Spotify player: '+t.title;$('player').append(f);$('status').textContent='Press play in the player.'}
   else $('status').textContent='Loading player…';
 }
 let timer=null,syncing=false;
@@ -558,10 +573,10 @@ async function sync(){
 }
 function decide(yes){
   if($('deck').hidden)return;const c=$('card'),t=st.deck[st.i];c.style.transform='translateX('+(yes?60:-60)+'px)';c.style.opacity='.3';
-  setTimeout(()=>{c.style.transform='';c.style.opacity='';st.picks.push({id:t.id,yes,title:t.title,artist:t.artist});st.i++;save();render();
+  setTimeout(()=>{c.style.transform='';c.style.opacity='';st.picks.push({id:t.id,yes,title:t.title,artist:t.artist});st.i++;learn(t,yes);save();render();
     if(yes){clearTimeout(timer);timer=setTimeout(sync,8000)}},150);
 }
-function undo(){if(!st.picks.length)return;const p=st.picks.pop();st.i--;save();render();
+function undo(){if(!st.picks.length)return;const p=st.picks.pop();st.i--;learn(p,p.yes,-1);save();render();
   if(p.yes&&st.synced.includes(p.id))$('syncStatus').textContent=`"${p.title}" is already in your playlist. Remove it there if you don't want it.`}
 function copyLinks(btn){
   const text=kept().map(trackUrl).join('\n'),o='Copy links';if(!text){btn.textContent='Keep a track first';setTimeout(()=>btn.textContent=o,1500);return}
