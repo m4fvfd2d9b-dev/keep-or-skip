@@ -6,15 +6,14 @@
 <title>Keep or Skip</title>
 <style>
 /* Layout: one calm glass player beside one glass side panel, on a near-black field */
-:root{--hue:230;--bg:#0b0b0e;--fg:#f4f4f6;--muted:#9a9aa3;--line:rgba(255,255,255,.1);--glass:rgba(255,255,255,.055);--hover:rgba(255,255,255,.1);
+:root{--hue:230;--bg:#080c16;--fg:#f4f4f6;--muted:#9a9aa3;--line:rgba(255,255,255,.1);--glass:rgba(255,255,255,.06);--hover:rgba(255,255,255,.1);
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{min-height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font);-webkit-font-smoothing:antialiased;
   padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-block:24px 40px}
-body::before{content:"";position:fixed;inset:0;z-index:-1;transition:background .8s ease;
-  background:radial-gradient(60vmax 45vmax at 30% 0%,hsl(var(--hue) 28% 24%/.55),transparent 70%),radial-gradient(50vmax 40vmax at 85% 100%,hsl(calc(var(--hue) + 40) 24% 20%/.4),transparent 70%)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,#0e1526 0%,#080c16 70%)}
 main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 header{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 h1{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0}
@@ -25,13 +24,13 @@ h1 em{font-style:normal;color:var(--muted);font-weight:400}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
 .col{display:flex;flex-direction:column;gap:18px;min-width:0}
 .card,.panel,.side{background:var(--glass);border:1px solid var(--line);border-radius:20px;
-  -webkit-backdrop-filter:blur(30px) saturate(130%);backdrop-filter:blur(30px) saturate(130%)}
-.card{padding:22px;display:flex;flex-direction:column;gap:16px;touch-action:pan-y;transition:transform .16s ease,opacity .16s ease}
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.card{padding:22px;display:flex;flex-direction:column;gap:16px;touch-action:pan-y;transform:translateZ(0)}
 .panel{padding:22px;display:flex;flex-direction:column;gap:12px}
 .panel h3{display:none}
 .drag{cursor:grab;user-select:none}
-.drag h2{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin:0;text-wrap:balance;overflow-wrap:anywhere}
-.artist{margin:4px 0 0;color:var(--muted)}
+.drag h2{min-height:2.4em;font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin:0;text-wrap:balance;overflow-wrap:anywhere}
+.artist{margin:4px 0 0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .player{min-height:352px}
 .player iframe{display:block;width:100%;height:352px;border:0;border-radius:14px}
 .jump{display:flex;gap:6px 16px;flex-wrap:wrap;align-items:center}
@@ -43,8 +42,8 @@ button:hover,.btn:hover{color:var(--fg)}
 .primary:hover{background:#fff;color:#0b0b0e}
 .verdict{display:flex;justify-content:center;gap:28px}
 .verdict button{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0;
-  background:var(--glass);border:1px solid var(--line);color:var(--fg);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);transition:transform .12s ease,background .12s ease}
-.verdict button:hover{background:var(--hover);transform:scale(1.05)}
+  background:var(--glass);border:1px solid var(--line);color:var(--fg);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:background .12s ease}
+.verdict button:hover{background:var(--hover)}
 #yes{background:var(--fg);color:#0b0b0e;border-color:transparent}
 #yes:hover{background:#fff}
 .verdict svg{width:24px;height:24px}
@@ -97,7 +96,7 @@ button:hover,.btn:hover{color:var(--fg)}
             <a class="btn" id="lyrics" target="_blank" rel="noopener">Lyrics</a>
             <a class="btn" id="openTrack" target="_blank" rel="noopener">Open in Spotify</a>
           </div>
-          <div class="jump" id="jumpRow" hidden>
+          <div class="jump" id="jumpRow" style="visibility:hidden">
             <button id="back30">Back 30 sec</button>
             <button id="fwd30">Forward 30 sec</button>
           </div>
@@ -435,6 +434,9 @@ const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))||f}catch(e){re
 const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 let st=load(KEY,{deck:[],i:0,picks:[],synced:[],playlistId:null,playlistUrl:null,refills:0});
 let auth=load(AUTH,null);
+if(location.hash==='#owner'){store('keep-or-skip-owner',true);history.replaceState(null,'',location.pathname)}
+if(st.v===2)store('keep-or-skip-owner',true);
+const isOwner=()=>load('keep-or-skip-owner',false)===true;
 const save=()=>store(KEY,st);
 const kept=()=>st.picks.filter(p=>p.yes);
 const GROUPS={'Dutch rap':['Kevin','Jack','Ares','Johnny Sellah','Frenna','Josylvio','Sevn Alias','Jonna Fraser','Boef','Ronnie Flex','Lil Kleine','Hef','Lijpe','Dopebwoy','Chivv','Kempi','Mula B','Bizzey','Ismo'],
@@ -509,28 +511,30 @@ async function buildStack(){
   say('Reading your saved tracks…');
   for(let o=0;o<300;o+=50){const j=await safe(()=>api(`/me/tracks?limit=50&offset=${o}`));(j?.items||[]).forEach(x=>own.push(norm(x.track,'saved')));if(!j?.next)break}
   const ta=await safe(()=>api('/me/top/artists?limit=20&time_range=medium_term'));topA=(ta?.items||[]).map(a=>[a.name,[a.id]]);
-  const list=[...ARTISTS,...topA.filter(a=>!ARTISTS.some(b=>b[0]===a[0]))];let n=0;
+  const seeds=isOwner()?ARTISTS:[],list=[...seeds,...topA.filter(a=>!seeds.some(b=>b[0]===a[0]))];let n=0;
   for(const [name,ids] of list){say(`Searching ${name}… (${++n} of ${list.length})`);
     for(const o of [0,10,20]){const j=await safe(()=>api(`/search?type=track&limit=10&offset=${base+o}&market=from_token&q=${encodeURIComponent('artist:"'+name+'"')}`));
       (j?.tracks?.items||[]).forEach(t=>{if(t&&t.artists.some(a=>ids?ids.includes(a.id):a.name.toLowerCase()===name.toLowerCase()))artists.push(norm(t,'artist'))});if(!j?.tracks?.next)break}}
-  const eyes=await safe(()=>api('/search?type=track&limit=10&market=from_token&q='+encodeURIComponent('track:"Eyes Without A Face" artist:"Billy Idol"')));(eyes?.tracks?.items||[]).forEach(t=>artists.push(norm(t,'artist')));
-  const picks=shuffle(SIMILAR).slice(0,45);n=0;
+  if(isOwner()){const eyes=await safe(()=>api('/search?type=track&limit=10&market=from_token&q='+encodeURIComponent('track:"Eyes Without A Face" artist:"Billy Idol"')));(eyes?.tracks?.items||[]).forEach(t=>artists.push(norm(t,'artist')))}
+  const tasteGroups=Object.keys(GROUPS).filter(g=>topA.some(a=>GROUPS[g].includes(a[0])));
+  const near=tasteGroups.flatMap(g=>GROUPS[g]).filter(x=>!topA.some(a=>a[0]===x));
+  const picks=isOwner()?shuffle(SIMILAR).slice(0,45):[...new Set([...shuffle(near).slice(0,35),...shuffle(SIMILAR).slice(0,10)])];n=0;
   for(const name of picks){say(`Finding new music: ${name}… (${++n} of ${picks.length})`);
     const o=Math.floor(Math.random()*4)*10;
     const j=await safe(()=>api(`/search?type=track&limit=10&offset=${o}&market=from_token&q=${encodeURIComponent('artist:"'+name+'"')}`));
     (j?.tracks?.items||[]).forEach(t=>{if(t&&t.artists.some(a=>a.name.toLowerCase()===name.toLowerCase()))fresh.push(norm(t,'new'))})}
   const seen=new Set(decided),uniq=l=>shuffle(l.filter(Boolean)).filter(t=>!seen.has(t.id)&&seen.add(t.id));
-  const a=uniq(own),d=uniq(fresh),b=uniq(artists),c=st.refills?[]:uniq(ALL),mix=[];
+  const a=uniq(own),d=uniq(fresh),b=uniq(artists),c=st.refills||!isOwner()?[]:uniq(ALL),mix=[];
   while(a.length||b.length||c.length||d.length){for(let i=0;i<4;i++)if(d.length)mix.push(d.pop());if(c.length)mix.push(c.pop());if(b.length)mix.push(b.pop());if(c.length)mix.push(c.pop());if(a.length)mix.push(a.pop())}
   const deck=[];while(mix.length){const r=deck.slice(-8).map(leadArtist);let k=mix.findIndex(t=>!r.includes(leadArtist(t)));if(k<0)k=0;deck.push(mix.splice(k,1)[0])}
   st.deck=st.deck.slice(0,st.i).concat(deck);save();
-  const nw=deck.filter(t=>t.src==='new').length;st.v=2;save();say(`${deck.length} tracks ready, including ${nw} new discoveries.`);
+  const nw=deck.filter(t=>t.src==='new').length;st.v=3;save();say(`${deck.length} tracks ready, including ${nw} new discoveries.`);
 }
 let controller=null,apiFailed=false,started=false,position=0;
 window.onSpotifyIframeApiReady=api_=>{const el=$('player');
   api_.createController(el,{uri:'spotify:track:7eqoqGkKwgOaWNNHx90uEZ',width:'100%',height:352,theme:'dark'},c=>{controller=c;
-    c.addListener('playback_update',e=>{position=e.data.position;const full=e.data.duration>35000;$('jumpRow').hidden=!full;
-      if(e.data.duration)$('status').textContent=full?'Full track. Jump ahead to find the chorus.':'30-second preview chosen by Spotify.'});
+    c.addListener('playback_update',e=>{position=e.data.position;if(!e.data.duration)return;const full=e.data.duration>35000;$('jumpRow').style.visibility=full?'visible':'hidden';
+      const m=full?'Full track. Jump ahead to find the chorus.':'30-second preview chosen by Spotify.';if($('status').textContent!==m)$('status').textContent=m});
     if(started)render()})};
 setTimeout(()=>{if(!controller){apiFailed=true;if(started)render()}},6000);
 const hueOf=a=>[...a].reduce((h,c)=>(h*31+c.charCodeAt(0))%360,7);
@@ -540,10 +544,10 @@ function stats(){
   $('kept').textContent=k.length;$('skipped').textContent=n-k.length;$('rate').textContent=(n?Math.round(k.length/n*100):0)+'%';
   const c={};k.forEach(t=>{const a=leadArtist(t);c[a]=(c[a]||0)+1});const top=Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,6);
   $('artists').textContent=Object.keys(c).length;$('topEmpty').hidden=!!top.length;$('recentEmpty').hidden=!!k.length;
-  $('topArtists').replaceChildren(...top.map(([a,v])=>{const li=document.createElement('li');li.className='row';
+  const topKey=JSON.stringify(top),recKey=k.slice(-6).map(x=>x.id).join();if(topKey!==stats.top){stats.top=topKey;$('topArtists').replaceChildren(...top.map(([a,v])=>{const li=document.createElement('li');li.className='row';
     const nm=document.createElement('span');nm.className='name';nm.textContent=a;const ct=document.createElement('span');ct.className='n';ct.textContent=v;
-    const tr=document.createElement('span');tr.className='track';const f=document.createElement('i');f.style.width=(v/top[0][1]*100)+'%';tr.append(f);li.append(nm,ct,tr);return li}));
-  $('recent').replaceChildren(...k.slice(-6).reverse().map(t=>{const li=document.createElement('li'),a=document.createElement('a');a.href=trackUrl(t);a.target='_blank';a.rel='noopener';a.textContent=t.title+' · '+t.artist;li.append(a);return li}));
+    const tr=document.createElement('span');tr.className='track';const f=document.createElement('i');f.style.width=(v/top[0][1]*100)+'%';tr.append(f);li.append(nm,ct,tr);return li}))}
+  if(recKey!==stats.rec){stats.rec=recKey;$('recent').replaceChildren(...k.slice(-6).reverse().map(t=>{const li=document.createElement('li'),a=document.createElement('a');a.href=trackUrl(t);a.target='_blank';a.rel='noopener';a.textContent=t.title+' · '+t.artist;li.append(a);return li}))}
   const g=Object.entries(brain().g).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).slice(0,3).map(x=>x[0]);
   $('taste').textContent=st.picks.length<5?'Your stack adapts as you choose.':g.length?'Leaning towards: '+g.join(', ')+'.':'Still learning your taste.';
   if(st.playlistUrl){$('openPlaylist').href=st.playlistUrl;$('openPlaylist').hidden=false}
@@ -552,9 +556,9 @@ function render(){
   stats();const done=started&&st.i>=st.deck.length;
   $('deck').hidden=done||!started;$('end').hidden=!done;$('start').hidden=started;
   if(done){if(controller)controller.pause();return}if(!started)return;
-  const t=st.deck[st.i];document.documentElement.style.setProperty('--hue',hueOf(t.artist));
+  const t=st.deck[st.i];
   $('lyrics').href='https://genius.com/search?q='+encodeURIComponent(t.title+' '+t.artist);$('openTrack').href=trackUrl(t);
-  $('title').textContent=t.title;$('artist').textContent=t.artist+(t.album?' · '+t.album:'');$('status').textContent='';$('jumpRow').hidden=true;
+  $('title').textContent=t.title;$('artist').textContent=t.artist+(t.album?' · '+t.album:'');$('jumpRow').style.visibility='hidden';
   if(controller){controller.loadUri('spotify:track:'+t.id);setTimeout(()=>controller.play(),500)}
   else if(apiFailed){$('player').innerHTML='';const f=document.createElement('iframe');f.src='https://open.spotify.com/embed/track/'+t.id+'?theme=0';f.allow='autoplay; encrypted-media';f.title='Spotify player: '+t.title;$('player').append(f);$('status').textContent='Press play in the player.'}
   else $('status').textContent='Loading player…';
@@ -572,8 +576,8 @@ async function sync(){
   syncing=false;save();stats();
 }
 function decide(yes){
-  if($('deck').hidden)return;const c=$('card'),t=st.deck[st.i];c.style.transform='translateX('+(yes?60:-60)+'px)';c.style.opacity='.3';
-  setTimeout(()=>{c.style.transform='';c.style.opacity='';st.picks.push({id:t.id,yes,title:t.title,artist:t.artist});st.i++;learn(t,yes);save();render();
+  if($('deck').hidden)return;const t=st.deck[st.i];
+  setTimeout(()=>{st.picks.push({id:t.id,yes,title:t.title,artist:t.artist});st.i++;learn(t,yes);save();render();
     if(yes){clearTimeout(timer);timer=setTimeout(sync,8000)}},150);
 }
 function undo(){if(!st.picks.length)return;const p=st.picks.pop();st.i--;learn(p,p.yes,-1);save();render();
@@ -601,7 +605,7 @@ addEventListener('keydown',e=>{if($('deck').hidden)return;if(e.key==='ArrowRight
   try{await callback()}catch(e){$('loadStatus').textContent=e.message;return}
   if(!auth)return;
   $('login').hidden=true;$('logout').hidden=false;$('startText').textContent='Your stack is being built from your Spotify.';
-  if(st.deck.length<=st.i||st.v!==2)await buildStack();
+  if(st.deck.length<=st.i||(st.v||0)<2)await buildStack();if(st.v===2){st.v=3;save()}
   $('startText').textContent=st.picks.length?'Welcome back. Your stack is ready.':'Your stack is ready. Listen, then keep it or skip it.';
   $('go').textContent=st.picks.length?'Pick up where you left off':'Start listening';$('go').hidden=false;
 })();
