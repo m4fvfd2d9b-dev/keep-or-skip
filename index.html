@@ -269,7 +269,7 @@ async function api(path,opt={},tries=3){
 
 /* state */
 let U=null,S=null;
-const fresh=()=>({v:3,model:{w:{'k:known':-.5},n:{}},pool:[],queue:[],cur:null,history:[],seen:{},known:{},tried:{},off:{},seeds:[],boot:false,
+const fresh=()=>({v:4,skips:{},banned:{},model:{w:{'k:known':-.5},n:{}},pool:[],queue:[],cur:null,history:[],seen:{},known:{},tried:{},off:{},seeds:[],boot:false,
   playlistId:null,playlistUrl:null,synced:[],skipIntro:true});
 const save=()=>{if(U)store('kos3:'+U,S)};
 const isOwner=()=>load('keep-or-skip-owner',false)===true;
@@ -283,7 +283,11 @@ function norm(t,src,reason,albumFallback){
     album:al.name||'',albumId:al.id||null,img:(imgs[0]||{}).url||'',thumb:(imgs[imgs.length-1]||imgs[0]||{}).url||'',
     year:+String(al.release_date||'').slice(0,4)||null,explicit:!!t.explicit,dur:t.duration_ms||0,src,reason};
 }
-function add(list){let n=0;for(const t of list){if(!t||S.seen[t.id])continue;S.seen[t.id]=1;S.pool.push(t);n++}return n}
+function add(list){let n=0;for(const t of list){if(!t||S.seen[t.id])continue;const a=lead(t).toLowerCase();if(isBanned(a))continue;
+  if([...S.pool,...S.queue].filter(x=>lead(x).toLowerCase()===a).length>=3)continue;S.seen[t.id]=1;S.pool.push(t);n++}return n}
+const isBanned=k=>{const b=S.banned[k];if(!b)return false;if(typeof b==='number')S.banned[k]={until:40,cd:40};return S.history.length<S.banned[k].until};
+const skipStreak=()=>{let n=0;for(let i=S.history.length-1;i>=0&&!S.history[i].yes;i--)n++;return n};
+const heard=()=>new Set(S.history.map(h=>lead(h.t).toLowerCase()));
 
 /* learning model: online weights per feature, with uncertainty-driven exploration */
 const LR={a:.9,f:.45,c:.45,y:.25,e:.12,d:.12,s:.2,k:.35};
@@ -298,13 +302,14 @@ function feats(t){
 const baseScore=t=>feats(t).reduce((s,f)=>s+(S.model.w[f]||0),0);
 const uncertainty=t=>{const fs=feats(t);return fs.reduce((s,f)=>s+1/Math.sqrt(1+(S.model.n[f]||0)),0)/fs.length};
 function score(t){
-  const recent=S.history.slice(-6).map(h=>lead(h.t));
-  const repeats=recent.filter(x=>x===lead(t)).length;
-  return baseScore(t)+gauss()*.9*uncertainty(t)-repeats*1.3;
+  const a=lead(t).toLowerCase(),recent=S.history.slice(-15).map(h=>lead(h.t).toLowerCase());
+  const plays=S.history.filter(h=>lead(h.t).toLowerCase()===a),keeps=plays.filter(h=>h.yes).length;
+  const repeats=recent.filter(x=>x===a).length;
+  return baseScore(t)+gauss()*.9*uncertainty(t)-repeats*1.1-(plays.length-keeps)*.7;
 }
-function learn(t,r,sign=1){
+function learn(t,r,sign=1,af=1){
   for(const f of feats(t)){const k=f.split(':')[0];let n=S.model.n[f]||0;if(sign<0)n=Math.max(0,n-1);
-    S.model.w[f]=(S.model.w[f]||0)+sign*LR[k]*r/(1+.08*n);S.model.n[f]=sign<0?n:n+1}
+    S.model.w[f]=(S.model.w[f]||0)+sign*LR[k]*r*(k==='a'?af:1)/(1+.08*n);S.model.n[f]=sign<0?n:n+1}
 }
 const reward=(yes,ms)=>{const s=ms/1000;return yes?(s>=40?1.3:1):(s<6?-1.3:s>60?-.4:-.9)};
 
@@ -313,10 +318,10 @@ const tasks=[];let running=0,started=false;
 function enqueue(fn){tasks.push(fn);pump()}
 function pump(){while(running<2&&tasks.length){running++;const fn=tasks.shift();
   fn().catch(()=>{}).finally(()=>{running--;onPoolChange();pump()})}}
-async function artistTracks(name,src,reason){
-  const key=name.toLowerCase(),off=S.off[key]||0;S.tried[key]=1;S.off[key]=off+10;if(off>=50)return;
+async function artistTracks(name,src,reason,avoid){
+  const key=name.toLowerCase();if(avoid)S.off[key]=Math.max(S.off[key]||0,20);const off=S.off[key]||0;S.tried[key]=1;S.off[key]=off+10;if(off>=70)return;
   const j=await api(`/search?type=track&limit=10&offset=${off}&market=from_token&q=${encodeURIComponent('artist:"'+name+'"')}`);
-  const hits=(j&&j.tracks&&j.tracks.items||[]).filter(t=>t&&t.artists.some(a=>a.name.toLowerCase()===key)).map(t=>norm(t,src,reason));
+  const hits=(j&&j.tracks&&j.tracks.items||[]).filter(t=>t&&t.artists.some(a=>a.name.toLowerCase()===key)).map(t=>norm(t,src,reason)).filter(t=>!avoid||(!avoid.albums.has(t.albumId)&&!(t.year&&avoid.decades.has(Math.floor(t.year/10)))));
   add(shuffle(hits).slice(0,6));
 }
 async function albumTracks(t){
@@ -338,10 +343,27 @@ function expand(t,yes){
       .forEach(n=>enqueue(()=>artistTracks(n,'graph','Because you kept '+a)));
     t.artists.slice(1).filter(x=>!S.tried[x.name.toLowerCase()]).slice(0,2).forEach(x=>enqueue(()=>artistTracks(x.name,'feat','Worked with '+a)));
     enqueue(()=>albumTracks(t));
-  }else if((S.model.w['a:'+a.toLowerCase()]||0)<-1.2){
-    S.pool=S.pool.filter(x=>lead(x)!==a);S.queue=S.queue.filter(x=>lead(x)!==a);
+  }else{
+    const k=a.toLowerCase(),last=S.history[S.history.length-1];S.skips[k]=(S.skips[k]||0)+(last&&last.af||1);
+    const kept=S.history.some(h=>h.yes&&lead(h.t).toLowerCase()===k);
+    if(S.skips[k]>=(kept?3:2)||(S.model.w['a:'+k]||0)<-1){const prev=S.banned[k];S.banned[k]={until:S.history.length+(prev&&prev.cd?prev.cd*2:40),cd:prev&&prev.cd?prev.cd*2:40};S.skips[k]=0;S.pool=S.pool.filter(x=>lead(x).toLowerCase()!==k);S.queue=S.queue.filter(x=>lead(x).toLowerCase()!==k)}
   }
-  if(S.pool.length+S.queue.length<70)refill();
+  discover();
+}
+function comebacks(){
+  for(const[k,b]of Object.entries(S.banned)){if(typeof b!=='object'||b.back||S.history.length<b.until)continue;b.back=true;
+    const skipped=S.history.filter(h=>!h.yes&&lead(h.t).toLowerCase()===k).map(h=>h.t);if(!skipped.length)continue;
+    const name=lead(skipped[0]),avoid={albums:new Set(skipped.map(t=>t.albumId)),decades:new Set(skipped.filter(t=>t.year).map(t=>Math.floor(t.year/10)))};
+    enqueue(()=>artistTracks(name,'comeback','Another side of '+name,avoid));}
+}
+function discover(){
+  comebacks();
+  const h=heard(),fresh=[...S.pool,...S.queue].filter(t=>!h.has(lead(t).toLowerCase())).length,streak=skipStreak();
+  if(fresh>=30&&streak<3&&S.pool.length+S.queue.length>=60)return;
+  const hot=Object.keys(CL).map(c=>[c,(S.model.w['c:'+c]||0)+Math.random()*(streak>=3?3:.8)]).sort((x,y)=>y[1]-x[1]);
+  const picks=streak>=3?shuffle(Object.keys(CL)).slice(0,3):[hot[0][0],hot[1][0],shuffle(Object.keys(CL))[0]];
+  for(const c of picks){const cand=shuffle(CL[c]).filter(n=>!S.tried[n.toLowerCase()]&&!isBanned(n.toLowerCase()));
+    if(cand.length)enqueue(()=>artistTracks(cand[0],'graph','New in '+LABEL[c]));else enqueue(()=>genreTracks(c))}
 }
 function refill(){
   const ranked=Object.keys(CL).map(c=>[c,(S.model.w['c:'+c]||0)+Math.random()*.8]).sort((x,y)=>y[1]-x[1]).slice(0,3);
@@ -355,11 +377,12 @@ function refill(){
 function rerank(){
   const all=[...S.queue,...S.pool].map(t=>[score(t),t]).sort((x,y)=>y[0]-x[0]).map(x=>x[1]);
   const seedSet=new Set(S.seeds.map(x=>x.toLowerCase()));
-  const isNew=t=>!seedSet.has(lead(t).toLowerCase())&&!(S.model.n['a:'+lead(t).toLowerCase()]>0)&&!S.known[t.id];
+  const hd=heard(),isNew=t=>!hd.has(lead(t).toLowerCase())&&!S.known[t.id]&&(!seedSet.has(lead(t).toLowerCase())||skipStreak()<3);
   const q=[];
   for(let slot=0;slot<5;slot++){
-    const wantNew=(S.history.length+(S.cur?1:0)+slot)%3===2;
-    let i=all.findIndex(t=>(!wantNew||isNew(t))&&!q.some(x=>lead(x)===lead(t)));
+    const pos=S.history.length+(S.cur?1:0)+slot,wantNew=skipStreak()>=3?pos%2===0:pos%3===2;
+    let i=slot===0&&!S.history.slice(-8).some(h=>h.t.src==='comeback')?all.findIndex(t=>t.src==='comeback'&&!q.some(x=>lead(x)===lead(t))):-1;
+    if(i<0)i=all.findIndex(t=>(!wantNew||isNew(t))&&!q.some(x=>lead(x)===lead(t)));
     if(i<0)i=all.findIndex(t=>!q.some(x=>lead(x)===lead(t)));
     if(i<0)break;q.push(all.splice(i,1)[0]);
   }
@@ -370,7 +393,7 @@ function rerank(){
 async function bootstrap(){
   const line=m=>$('loadline').innerHTML='<span class="spinner"></span>'+m;
   line('Connecting…');
-  const me=await api('/me');U=me.id;S=load('kos3:'+U,null);if(!S||S.v!==3)S=fresh();
+  const me=await api('/me');U=me.id;const old=load('kos3:'+U,null);S=old&&old.v===4?old:{...fresh(),...(old?{playlistId:old.playlistId,playlistUrl:old.playlistUrl,synced:old.synced||[]}:{})};
   $('intro').checked=S.skipIntro;
   if(!S.boot){
     line('Reading your listening history…');
@@ -381,8 +404,8 @@ async function bootstrap(){
     for(let o=0;o<200;o+=50){try{const j=await api(`/me/tracks?limit=50&offset=${o}`);(j&&j.items||[]).forEach(x=>{if(x.track){S.known[x.track.id]=1;bump(x.track.artists[0]&&x.track.artists[0].name)}});if(!j||!j.next)break}catch(e){break}}
     if(isOwner())OWNER_SEEDS.forEach(bump);
     S.seeds=seeds.slice(0,40);
-    S.seeds.forEach((a,i)=>{const k='a:'+a.toLowerCase();S.model.w[k]=(S.model.w[k]||0)+.6*(1-i/60);
-      for(const c of clustersOf(a))S.model.w['c:'+c]=Math.min(1,(S.model.w['c:'+c]||0)+.12)});
+    S.seeds.forEach((a,i)=>{const k='a:'+a.toLowerCase();S.model.w[k]=(S.model.w[k]||0)+.3*(1-i/60);
+      for(const c of clustersOf(a))S.model.w['c:'+c]=Math.min(.4,(S.model.w['c:'+c]||0)+.05)});
     S.boot=true;save();
   }
   line('Building your stack…');
@@ -478,8 +501,8 @@ function advance(){
 let busy=false;
 function decide(yes){
   if(!started||!S.cur||busy)return;busy=true;
-  const t=S.cur,r=reward(yes,listened());
-  learn(t,r);S.history.push({t,yes,r});
+  const t=S.cur,ms=listened(),r=reward(yes,ms),af=yes?1:ms<6000?1:ms>45000?.25:.6;
+  learn(t,r,1,af);S.history.push({t,yes,r,af});
   const c=$('card');c.style.transition='transform .28s ease,opacity .28s ease';
   c.style.transform=`translateX(${yes?140:-140}px) rotate(${yes?8:-8}deg)`;c.style.opacity='0';
   setTimeout(()=>{c.style.transition='none';c.style.transform='';c.style.opacity='';stamps(0);
@@ -489,7 +512,7 @@ function decide(yes){
 }
 function undo(){
   if(!S.history.length||busy)return;
-  const h=S.history.pop();learn(h.t,h.r,-1);
+  const h=S.history.pop();learn(h.t,h.r,-1,h.af||1);if(!h.yes){const k=lead(h.t).toLowerCase();S.skips[k]=Math.max(0,(S.skips[k]||0)-(h.af||1))}
   if(S.cur)S.queue.unshift(S.cur);
   S.cur=h.t;render();play(S.cur);save();
   if(h.yes&&S.synced.includes(h.t.id))toast('Already in your playlist. Remove it there if you don\'t want it.');
